@@ -87,6 +87,31 @@ buckets.set(3, new Set<Flashcard>());
 buckets.set(4, new Set<Flashcard>());
 buckets.set(5, new Set<Flashcard>());
 
+function setupBuckets() {
+  // Clear all buckets first
+  buckets.clear();
+  buckets.set(0, new Set<Flashcard>());
+  buckets.set(1, new Set<Flashcard>());
+  buckets.set(2, new Set<Flashcard>());
+  buckets.set(3, new Set<Flashcard>());
+  buckets.set(4, new Set<Flashcard>());
+  buckets.set(5, new Set<Flashcard>());
+
+  // Randomly distribute cards across buckets
+  buckets.get(0)?.add(card1);
+  buckets.get(2)?.add(card2);
+  buckets.get(4)?.add(card3);
+  buckets.get(1)?.add(card4);
+  buckets.get(3)?.add(card5);
+  buckets.get(5)?.add(card6);
+  buckets.get(2)?.add(card7);
+  buckets.get(4)?.add(card8);
+  buckets.get(0)?.add(card9);
+  buckets.get(3)?.add(card10);
+
+  bucketSets = toBucketSets(buckets);
+}
+
 /*
  * Testing strategy for toBucketSets():
  * test that the buckets are correctly distributed
@@ -99,30 +124,8 @@ buckets.set(5, new Set<Flashcard>());
  * TODO: Describe your testing strategy for toBucketSets() here.
  */
 describe("toBucketSets()", () => {
-  beforeEach(() => {
-    // Clear all buckets first
-    buckets.clear();
-    buckets.set(0, new Set<Flashcard>());
-    buckets.set(1, new Set<Flashcard>());
-    buckets.set(2, new Set<Flashcard>());
-    buckets.set(3, new Set<Flashcard>());
-    buckets.set(4, new Set<Flashcard>());
-    buckets.set(5, new Set<Flashcard>());
 
-    // Randomly distribute cards across buckets
-    buckets.get(0)?.add(card1);
-    buckets.get(2)?.add(card2);
-    buckets.get(4)?.add(card3);
-    buckets.get(1)?.add(card4);
-    buckets.get(3)?.add(card5);
-    buckets.get(5)?.add(card6);
-    buckets.get(2)?.add(card7);
-    buckets.get(4)?.add(card8);
-    buckets.get(0)?.add(card9);
-    buckets.get(3)?.add(card10);
-
-    bucketSets = toBucketSets(buckets);
-  });
+  beforeEach(setupBuckets);
 
   it("buckets are correctly distributed", () => {
     // Compare each bucket's contents independently
@@ -194,14 +197,149 @@ describe("getBucketRange()", () => {
 
 /*
  * Testing strategy for practice():
- *
- * TODO: Describe your testing strategy for practice() here.
+ * flashcards in bucket 0 are always selected for practice
+ * flashcards in bucket i are selected for practice every 2^i days
+ * Partition on bucket configurations:
+ * - Single card per bucket
+ * - Multiple cards per bucket 
+ * - Empty buckets
+ * - Sparse buckets (gaps between filled buckets)
+ * - Dense buckets (consecutive filled buckets)
  */
 describe("practice()", () => {
-  it("Example test case - replace with your own tests", () => {
-    assert.fail(
-      "Replace this test case with your own tests based on your testing strategy"
-    );
+  beforeEach(setupBuckets);
+
+  it("bucket 0 cards are always selected for practice regardless of day", () => {
+    // Test multiple random days
+    for (let day = 0; day < 50; day++) {
+      let practiceSet = practice([...bucketSets], day);
+      assert(practiceSet.has(card1) && practiceSet.has(card9), 
+        `Bucket 0 cards should be selected on day ${day}`);
+    }
+  });
+
+  it("bucket 1 cards are selected only when day % 2 === 0", () => {
+    // Test with single card
+    buckets.clear();
+    buckets.set(1, new Set([card4]));
+    const singleCardBuckets = toBucketSets(buckets);
+
+    // Test with multiple cards
+    buckets.clear(); 
+    buckets.set(1, new Set([card4, card5, card6]));
+    const multipleCardBuckets = toBucketSets(buckets);
+
+    for (let day = 0; day < 10; day++) {
+      // Test single card bucket
+      let practiceSet = practice([...singleCardBuckets], day);
+      if (day % 2 === 0) {
+        assert(practiceSet.has(card4),
+          `Single card in bucket 1 should be selected on day ${day}`);
+      } else {
+        assert(!practiceSet.has(card4),
+          `Single card in bucket 1 should not be selected on day ${day}`);
+      }
+
+      // Test multiple cards bucket
+      practiceSet = practice([...multipleCardBuckets], day);
+      if (day % 2 === 0) {
+        assert(practiceSet.has(card4) && practiceSet.has(card5) && practiceSet.has(card6),
+          `All cards in bucket 1 should be selected on day ${day}`);
+      } else {
+        assert(!practiceSet.has(card4) && !practiceSet.has(card5) && !practiceSet.has(card6),
+          `No cards in bucket 1 should be selected on day ${day}`);
+      }
+    }
+  });
+
+  it("tests sparse bucket configuration", () => {
+    // Setup sparse buckets with gaps
+    buckets.clear();
+    buckets.set(0, new Set([card1]));
+    buckets.set(2, new Set([card2]));
+    buckets.set(4, new Set([card3]));
+    const sparseBuckets = toBucketSets(buckets);
+
+    for (let day = 0; day < 20; day++) {
+      let practiceSet = practice([...sparseBuckets], day);
+      
+      // Bucket 0 always selected
+      assert(practiceSet.has(card1), 
+        `Bucket 0 card should be selected on day ${day}`);
+      
+      // Bucket 2 selected every 4 days
+      if (day % 4 === 0) {
+        assert(practiceSet.has(card2),
+          `Bucket 2 card should be selected on day ${day}`);
+      }
+      
+      // Bucket 4 selected every 16 days
+      if (day % 16 === 0) {
+        assert(practiceSet.has(card3),
+          `Bucket 4 card should be selected on day ${day}`);
+      }
+    }
+  });
+
+  it("tests dense bucket configuration", () => {
+    // Setup consecutive buckets
+    buckets.clear();
+    buckets.set(0, new Set([card1]));
+    buckets.set(1, new Set([card2]));
+    buckets.set(2, new Set([card3]));
+    buckets.set(3, new Set([card4]));
+    const denseBuckets = toBucketSets(buckets);
+
+    const testDays = [0, 2, 4, 8, 16];
+    for (const day of testDays) {
+      let practiceSet = practice([...denseBuckets], day);
+      
+      assert(practiceSet.has(card1),
+        `Bucket 0 card should always be selected on day ${day}`);
+        
+      if (day % 2 === 0) {
+        assert(practiceSet.has(card2),
+          `Bucket 1 card should be selected on day ${day}`);
+      }
+      
+      if (day % 4 === 0) {
+        assert(practiceSet.has(card3),
+          `Bucket 2 card should be selected on day ${day}`);
+      }
+      
+      if (day % 8 === 0) {
+        assert(practiceSet.has(card4),
+          `Bucket 3 card should be selected on day ${day}`);
+      }
+    }
+  });
+
+  it("handles empty buckets correctly", () => {
+    // Setup empty buckets
+    buckets.clear();
+    for (let i = 0; i < 5; i++) {
+      buckets.set(i, new Set());
+    }
+    const emptyBuckets = toBucketSets(buckets);
+
+    for (let day = 0; day < 20; day++) {
+      let practiceSet = practice([...emptyBuckets], day);
+      assert(practiceSet.size === 0,
+        `No cards should be selected from empty buckets on day ${day}`);
+    }
+  });
+
+  it("bucket 5 cards are never selected for practice on any day", () => {
+    // Test with both single and multiple cards
+    buckets.clear();
+    buckets.set(5, new Set([card6, card7, card8]));
+    const bucket5Cards = toBucketSets(buckets);
+
+    for (let day = 0; day < 50; day++) {
+      let practiceSet = practice([...bucket5Cards], day);
+      assert(!practiceSet.has(card6) && !practiceSet.has(card7) && !practiceSet.has(card8),
+        `No bucket 5 cards should be selected on day ${day}`);
+    }
   });
 });
 
