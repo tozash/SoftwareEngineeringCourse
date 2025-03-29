@@ -19,8 +19,15 @@ import { Flashcard, AnswerDifficulty, BucketMap } from "./flashcards";
  * @spec.requires buckets is a valid representation of flashcard buckets.
  */
 export function toBucketSets(buckets: BucketMap): Array<Set<Flashcard>> {
-  // TODO: Implement this function
-  throw new Error("Implement me!");
+  // Find the maximum bucket number
+  const maxBucket = Math.max(...Array.from(buckets.keys()));
+  const bucketSets: Array<Set<Flashcard>> = [];
+  
+  // Create array with all buckets from 0 to maxBucket
+  for (let i = 0; i <= maxBucket; i++) {
+    bucketSets.push(buckets.get(i) || new Set<Flashcard>());
+  }
+  return bucketSets;
 }
 
 /**
@@ -35,7 +42,22 @@ export function getBucketRange(
   buckets: Array<Set<Flashcard>>
 ): { minBucket: number; maxBucket: number } | undefined {
   // TODO: Implement this function
-  throw new Error("Implement me!");
+  let minBucket = buckets.length;
+  let maxBucket = 0;
+  for (let i = 0; i < buckets.length; i++) {
+    if (buckets[i]!.size > 0) {
+      if (i < minBucket) {
+        minBucket = i;
+      }
+      if (i > maxBucket) {
+        maxBucket = i;
+      }
+    }
+  }
+  if (minBucket === buckets.length) {
+    return undefined;
+  }
+  return { minBucket, maxBucket };
 }
 
 /**
