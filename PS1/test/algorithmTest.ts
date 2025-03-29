@@ -9,6 +9,13 @@ import {
   computeProgress,
 } from "../src/algorithm";
 
+// Add AnswerAttempt interface
+interface AnswerAttempt {
+  card: Flashcard;
+  difficulty: AnswerDifficulty;
+  date: Date;
+}
+
 // Sample flashcards for testing
 let bucketSets: ReadonlyArray<Set<Flashcard>>;
 
@@ -419,7 +426,21 @@ describe("practice()", () => {
 /*
  * Testing strategy for update():
  *
- * TODO: Describe your testing strategy for update() here.
+ * Partition the input space for update() testing:
+ * - Card location: test cards in each bucket (0-5)
+ * - Answer difficulty: test all AnswerDifficulty values (Easy, Hard, Wrong)
+ * - Boundary cases:
+ *   - Cards in bucket 0 moving down (should stay in 0)
+ *   - Cards in bucket 4 moving up (should move to 5) 
+ *   - Multiple cards in same bucket
+ * - Card movement:
+ *   - Moving up one bucket (Easy)
+ *   - Moving down one bucket (Hard)
+ *   - Moving to bucket 0 (Wrong)
+ * - Verify:
+ *   - Card is removed from original bucket
+ *   - Card is added to correct new bucket
+ *   - Other cards remain unchanged
  */
 describe("update()", () => {
   beforeEach(() => {
@@ -539,7 +560,8 @@ describe("update()", () => {
     });
   });
   describe("handles easy answer correctly", () => {
-    it("when we answer easy in bucket 0", () => {
+    it("moves cards up one bucket on easy answer", () => {
+      // Test bucket 0 first
       const updatedBuckets = update(buckets, card1, AnswerDifficulty.Easy);
       assert(!updatedBuckets.get(0)?.has(card1) && updatedBuckets.get(0)?.has(card9),
         "Bucket 0 should not contain card 1 and Should contain card 9"
@@ -550,8 +572,7 @@ describe("update()", () => {
       assert(updatedBuckets.get(1)?.has(card4),
         "Card 4 should be in bucket 1 after easy answer on card 1"
       );
-    });
-    it("when we answer easy in buckets 1-4, card moves to bucket above original bucket", () => {
+
       // Test each bucket from 0 to 4 - card should move up one bucket on easy answer
       const cardsToTest = [
         { bucket: 0, card: card1 },
@@ -590,26 +611,165 @@ describe("update()", () => {
 
 /*
  * Testing strategy for getHint():
- *
- * TODO: Describe your testing strategy for getHint() here.
+ * 
+ * Weak spec tests:
+ * - Returns a non-empty string
+ * - Returns the card's hint property
+ * 
+ * Strong spec tests:
+ * - For language learning:
+ *   - Returns a hint that includes the first letter of the answer
+ *   - Returns a hint that includes the length of the answer
+ *   - Returns a hint that includes the category/topic
+ * - For math learning:
+ *   - Returns a hint that includes the operation type
+ *   - Returns a hint that includes the range of possible answers
+ *   - Returns a hint that includes the difficulty level
  */
 describe("getHint()", () => {
-  it("Example test case - replace with your own tests", () => {
-    assert.fail(
-      "Replace this test case with your own tests based on your testing strategy"
-    );
+  // Tests for weak spec
+  it("function returns a valid hint for card", () => {
+    const hint = getHint(card1);
+    assert(hint.length > 0, "Hint should be a non-empty string");
+    assert(hint.includes(card1.hint), "Hint should contain the hint for card1");
+  });
+
+  // Tests for strong spec - language learning
+  it("provides helpful hints for language learning cards", () => {
+    const hint = getHint(card1); // "What is the capital of France?"
+    assert(hint.includes("starts with 'P'"), "Hint should include first letter");
+    assert(hint.includes("5 letters"), "Hint should include answer length");
+    assert(hint.includes("geography"), "Hint should include category");
+  });
+
+  // Tests for strong spec - math learning
+  it("provides helpful hints for math learning cards", () => {
+    const hint = getHint(card2); // "What is 2+2?"
+    assert(hint.includes("addition"), "Hint should include operation type");
+    assert(hint.includes("between 0 and 10"), "Hint should include answer range");
+    assert(hint.includes("basic"), "Hint should include difficulty level");
   });
 });
 
 /*
  * Testing strategy for computeProgress():
- *
- * TODO: Describe your testing strategy for computeProgress() here.
+ * 
+ * Test cases:
+ * 1. Basic statistics
+ *    - Total cards count
+ *    - Mastered cards count
+ *    - Learning cards count
+ * 
+ * 2. Difficulty statistics
+ *    - Counts for each difficulty level
+ *    - Percentages for each difficulty level
+ * 
+ * 3. Learning speed
+ *    - Average days to master calculation
+ *    - Edge cases (same day, multiple days)
+ * 
+ * 4. Recent performance
+ *    - Last week attempts count
+ *    - Success rate calculation
+ *    - Most challenging cards identification
+ * 
+ * 5. Precondition validation
+ *    - Empty history
+ *    - Unordered history
+ *    - Cards in history not in buckets
+ *    - Cards in buckets without history
  */
 describe("computeProgress()", () => {
-  it("Example test case - replace with your own tests", () => {
-    assert.fail(
-      "Replace this test case with your own tests based on your testing strategy"
+  let testBuckets: BucketMap;
+  let testHistory: AnswerAttempt[];
+  let today: Date;
+  let yesterday: Date;
+
+  beforeEach(() => {
+    // Setup test buckets
+    testBuckets = new Map<number, Set<Flashcard>>();
+    for (let i = 0; i < 6; i++) {
+      testBuckets.set(i, new Set());
+    }
+    
+    // Add some cards to buckets
+    testBuckets.get(0)?.add(card1);
+    testBuckets.get(2)?.add(card2);
+    testBuckets.get(5)?.add(card3); // Mastered card
+    
+    // Setup test history with properly ordered dates
+    today = new Date();
+    yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    // Create history with dates in ascending order
+    testHistory = [
+      { card: card1, difficulty: AnswerDifficulty.Wrong, date: yesterday },
+      { card: card2, difficulty: AnswerDifficulty.Easy, date: yesterday },
+      { card: card3, difficulty: AnswerDifficulty.Easy, date: yesterday },
+      { card: card1, difficulty: AnswerDifficulty.Hard, date: today },
+      { card: card2, difficulty: AnswerDifficulty.Easy, date: today },
+      { card: card3, difficulty: AnswerDifficulty.Easy, date: today }
+    ];
+  });
+
+  it("calculates basic statistics correctly", () => {
+    const stats = computeProgress(testBuckets, testHistory);
+    
+    assert.equal(stats.totalCards, 3, "Should count total cards correctly");
+    assert.equal(stats.masteredCards, 1, "Should count mastered cards correctly");
+    assert.equal(stats.learningCards, 2, "Should count learning cards correctly");
+  });
+
+  it("calculates difficulty statistics correctly", () => {
+    const stats = computeProgress(testBuckets, testHistory);
+    
+    assert.equal(stats.difficultyStats[AnswerDifficulty.Easy].count, 4, "Should count easy answers correctly");
+    assert.equal(stats.difficultyStats[AnswerDifficulty.Hard].count, 1, "Should count hard answers correctly");
+    assert.equal(stats.difficultyStats[AnswerDifficulty.Wrong].count, 1, "Should count wrong answers correctly");
+    
+    // Check percentages
+    assert.equal(stats.difficultyStats[AnswerDifficulty.Easy].percentage, 66.67, "Should calculate easy percentage correctly");
+    assert.equal(stats.difficultyStats[AnswerDifficulty.Hard].percentage, 16.67, "Should calculate hard percentage correctly");
+    assert.equal(stats.difficultyStats[AnswerDifficulty.Wrong].percentage, 16.67, "Should calculate wrong percentage correctly");
+  });
+
+  it("calculates learning speed correctly", () => {
+    const stats = computeProgress(testBuckets, testHistory);
+    assert.equal(stats.averageDaysToMaster, 1, "Should calculate average days to master correctly");
+  });
+
+  it("calculates recent performance correctly", () => {
+    const stats = computeProgress(testBuckets, testHistory);
+    
+    assert.equal(stats.lastWeekStats.totalAttempts, 6, "Should count last week attempts correctly");
+    assert.equal(stats.lastWeekStats.successRate, 83.33, "Should calculate success rate correctly");
+    assert.equal(stats.lastWeekStats.mostChallengingCards.length, 1, "Should identify challenging cards correctly");
+    assert.equal(stats.lastWeekStats.mostChallengingCards[0]!.card, card1, "Should identify most challenging card correctly");
+  });
+
+  it("validates preconditions correctly", () => {
+    // Test empty history
+    assert.throws(
+      () => computeProgress(testBuckets, []),
+      { message: "History cannot be empty" }
+    );
+    
+    // Test unordered history
+    const unorderedHistory = [...testHistory];
+    unorderedHistory[0]!.date = today;
+    unorderedHistory[1]!.date = yesterday;
+    assert.throws(
+      () => computeProgress(testBuckets, unorderedHistory),
+      { message: "History must be ordered by date" }
+    );
+    
+    // Test card in history not in buckets
+    const extraCard = new Flashcard("Extra", "Answer", "Hint", ["test"]);
+    const invalidHistory = [...testHistory, { card: extraCard, difficulty: AnswerDifficulty.Easy, date: new Date() }];
+    assert.throws(
+      () => computeProgress(testBuckets, invalidHistory),
+      { message: "All cards in history must exist in buckets" }
     );
   });
 });
