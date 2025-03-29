@@ -73,8 +73,17 @@ export function practice(
   buckets: Array<Set<Flashcard>>,
   day: number
 ): Set<Flashcard> {
-  // TODO: Implement this function
-  throw new Error("Implement me!");
+  const practiceSet = new Set<Flashcard>();
+  for (let i = 0; i < buckets.length ; i++) {
+    if (buckets[i]!.size > 0 && i !== 5) {
+      // Bucket 0 is always practiced, bucket i is practiced every 2^i days
+      if (i === 0 || day % Math.pow(2, i) === 0) {
+        // Add all cards from this bucket
+        buckets[i]!.forEach(card => practiceSet.add(card));
+      }
+    }
+  }
+  return practiceSet;
 }
 
 /**
